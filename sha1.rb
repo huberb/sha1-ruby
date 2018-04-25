@@ -1,7 +1,4 @@
-require 'pry'
-
 class Sha1
-    # [2262422101, 3793833677, 1288310910, 3341981966, 72020916]
     def initialize(message)
         @bitstring = message.unpack('B*')[0]
         @orig_message_len = @bitstring.length
@@ -26,23 +23,12 @@ class Sha1
         # as a 64-bit big-endian integer.
         # Thus, the total length is a multiple of 512 bits.
         @bitstring += (("0" * (64 - @orig_message_len.to_s(2).length)) + @orig_message_len.to_s(2))
-        if @bitstring.length % 512 == 0
-            @bitstring
-        else
-            throw("Error, Message length is wrong!")
-        end
     end
 
     def split_up(string, size)
-        if block_given?
-            (string.length / size).times do |i|
-                yield string[i * size, size]
-            end
-        else
-            (string.length / size).times.collect do |i|
-                string[i * size, size]
-            end
-        end
+        strings = (string.length / size).times.collect { |i| string[i * size, size] }
+        strings.each{ |s| yield s } if block_given?
+        strings
     end
 
     def left_rotate(word, count)
@@ -52,7 +38,7 @@ class Sha1
     def append_words(words)
         (16...80).each do |i|
             new_word = words[i-3] ^ words[i-8] ^ words[i-14] ^ words[i-16]
-            words[i] = left_rotate(new_word, 1) & 2**32-1
+            words[i] = left_rotate(new_word, 1) & (2**32)-1
         end
         words
     end
@@ -64,7 +50,6 @@ class Sha1
         d = @hash_words[:d]
         e = @hash_words[:e]
 
-        # this is correct by now
         (0...80).each do |i|
             if i <= 19
                 f = (b & c) ^ ((~b) & d)
@@ -79,9 +64,7 @@ class Sha1
                 f = b ^ c ^ d
                 k = 0xCA62C1D6
             end
-            rotated_a = left_rotate(a, 5)
-            tmp = (rotated_a + f + e + k + words[i]) & 2**32-1
-
+            tmp = (left_rotate(a, 5) + f + e + k + words[i]) & 2**32-1
             e = d
             d = c
             c = left_rotate(b, 30) & 2**32-1
@@ -118,7 +101,6 @@ class Sha1
             words = words.map { |word| word.to_i(2) }
             # extend the sixteen 32-bit words into eighty 32-bit words:
             words = append_words(words)
-            # words.each { |w| puts(w) }
             # go into main loop
             compression(words)
         end
@@ -127,5 +109,5 @@ class Sha1
 end
 
 ARGV.each do |message|
-    puts(Sha1.new(File.open(message).read()).digest())
+    puts("#{Sha1.new(File.open(message).read()).digest()}  #{message}")
 end
